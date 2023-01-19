@@ -1,0 +1,141 @@
+﻿@page "/"
+@using WpfBlazorBooks.Data
+@inject BookService BS
+
+<main>
+    <div class="block_head">
+        <h2>Таблица книг</h2>
+        <label class="form-label">Отсортировать по:
+            <select @bind="@orderOption" @bind:event="oninput" @onchange="GetBooksOrderedAsync">
+                <option value="Title">Названию</option>
+                <option value="Author">Автору</option>
+                <option value="Published">Дате</option>
+            </select>
+        </label>
+        <form @onsubmit="GetBooksByPropertyAsync">
+            <label class="form-label">
+                Найти книги по:
+                <select @bind="@searchOption">
+                    <option value="Title">Названию</option>
+                    <option value="Author">Автору</option>
+                    <option value="Published">Дате</option>
+                </select>
+            </label>
+            <input type="text" @bind="@searchValue"/>
+            <button type="submit">Найти</button>
+        </form>
+    </div>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Название</th>
+                <th>Автор</th>
+                <th>Дата выпуска</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var book in books)
+            {
+                <tr>
+                    <td>
+                        @book.Id
+                    </td>
+                    <td>
+                        @book.Title
+                    </td>
+                    <td>
+                        @book.Author
+                    </td>
+                    <td>
+                        @book.Published
+                    </td>
+                    <td>
+                        <button class="btn btn-danger" @onclick="() => DeleteBookAsync(book)">Удалить</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <form class="book_form" @onsubmit="() => AddBookAsync(emptyBook)">
+        <label class="form-label">
+            Название:
+            <input type="text" class="form-control" id="title" @bind-value="@emptyBook.Title" />
+        </label>
+        <label class="form-label">
+            Автор:
+            <input type="text" class="form-control" id="author" @bind-value="@emptyBook.Author" />
+        </label>
+        <label class="form-label">
+            Дата выпуска:
+            <input type="date" class="form-control" id="published" @bind-value="@emptyBook.Published" />
+        </label>
+        <button type="submit" class="btn btn-primary">Добавить</button>
+    </form>
+</main>
+
+@code {
+    Book emptyBook = new();
+    string orderOption = string.Empty;
+    string searchOption = string.Empty;
+    string searchValue = string.Empty;
+    List<Book> books = new();
+
+    private async Task AddBookAsync(Book book)
+    {
+        var addingTask = BS.AddBookAsync(book);
+        await addingTask;
+        addingTask.Wait();
+        await Fetch();
+        emptyBook = new();
+    }
+
+    private async Task GetBooksOrderedAsync()
+    {
+        if (Enum.TryParse(orderOption, out PropertyEnum optionAsEnum))
+        {
+            var gettingOrderedTask = BS.GetBooksOrderedAsync(await BS.GetBooksFromDBAsync(), optionAsEnum);
+            books = await gettingOrderedTask;
+            gettingOrderedTask.Wait();
+            await Fetch();
+        }
+    }
+
+    private async Task GetBooksByPropertyAsync()
+    {
+        if (Enum.TryParse(searchOption, out PropertyEnum searchOptionAsEnum))
+        {
+            var gettingBooksTask = BS.GetBooksByPropertyAsync(await BS.GetBooksFromDBAsync(), searchOptionAsEnum, searchValue);
+            books = await gettingBooksTask;
+            gettingBooksTask.Wait();
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteBookAsync(Book book)
+    {
+        books.Remove(book);
+        var deletingTask = BS.DeleteBookAsync(book);
+        await deletingTask;
+        deletingTask.Wait();
+        await Fetch();
+    }
+
+    private async Task Fetch()
+    {
+        if (orderOption == string.Empty)
+        {        
+            books = await BS.GetBooksFromDBAsync();
+        }
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Fetch();
+    }
+}
